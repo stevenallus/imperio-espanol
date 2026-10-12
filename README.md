@@ -61,10 +61,10 @@ son deliberadamente estilizadas y sin gore.
 Three.js r160 (ES modules + import map) en un único `index.html` autocontenido, sin dependencias de
 compilación: terreno analítico compartido por render y física, vegetación instanciada con texturas de
 lienzo generadas en tiempo de ejecución, shaders propios para cielo/agua/partículas y audio 100 %
-sintetizado con WebAudio. El grito «¡¿Dónde está el oro?!» pronuncia la frase de verdad —un motor de
-fonemas propio encadena DÓN-DE ES-TÁ EL O-RO con vocales por formantes, consonantes de ruido, garra
-por saturación, capa demoníaca una octava abajo y sub-bajo—, con eco aterrador por reverb de
-convolución y una sacudida de cámara; el mar se atenúa mientras retumba el eco.
+sintetizado con WebAudio. El grito de guerra (F) es un rugido masculino potente y seco, sin eco:
+formantes de vocal abierta, saturación agresiva, capa demoníaca una octava abajo, sub-bajo y ataque
+de aire; al lanzarlo tiemblan la cámara, la interfaz y la pantalla completas, y el mar se atenúa
+durante el rugido.
 
 ## Hooks de depuración
 

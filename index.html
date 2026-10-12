@@ -31,7 +31,7 @@
 
   #subtitle{ position:absolute; left:50%; bottom:96px; transform:translateX(-50%); font-size:19px; font-style:italic; color:var(--pergamino); opacity:0; transition:opacity .4s; white-space:nowrap; }
   #shoutText{ position:absolute; left:50%; top:34%; transform:translate(-50%,-50%) scale(.4); font-size:58px; font-weight:bold; color:var(--oro); text-shadow:0 3px 0 #5a3c08, 0 6px 18px rgba(0,0,0,.7); opacity:0; pointer-events:none; letter-spacing:.02em; }
-  #shoutText.pop{ animation:grito 2.3s ease-out forwards; }
+  #shoutText.pop{ animation:grito 1.05s ease-out forwards; }
   @keyframes grito{
     0%{ opacity:0; transform:translate(-50%,-50%) scale(.35) rotate(-4deg); }
     6%{ opacity:1; transform:translate(-50%,-50%) scale(1.18) rotate(2deg); }
@@ -39,6 +39,22 @@
     82%{ opacity:1; }
     100%{ opacity:0; transform:translate(-50%,-56%) scale(1.02); }
   }
+
+  @keyframes tremor{
+    0%,100%{ transform:translate(0,0) scale(1.02); }
+    8%{ transform:translate(-7px,4px) scale(1.02); }
+    17%{ transform:translate(6px,-5px) scale(1.02); }
+    25%{ transform:translate(-5px,-6px) scale(1.02); }
+    33%{ transform:translate(7px,5px) scale(1.02); }
+    42%{ transform:translate(-6px,3px) scale(1.02); }
+    50%{ transform:translate(5px,-4px) scale(1.02); }
+    58%{ transform:translate(-4px,5px) scale(1.02); }
+    67%{ transform:translate(4px,-3px) scale(1.02); }
+    75%{ transform:translate(-3px,2px) scale(1.02); }
+    83%{ transform:translate(2px,-2px) scale(1.02); }
+    92%{ transform:translate(-1px,1px) scale(1.02); }
+  }
+  body.tremor #game, body.tremor #hud{ animation:tremor 0.85s linear; }
 
   #vignette{ position:absolute; inset:0; box-shadow:inset 0 0 140px 60px rgba(158,20,10,.85); opacity:0; }
 
@@ -182,104 +198,62 @@ const Snd = {
   clang(){ if(!this.ctx)return; const t=this.ctx.currentTime; this._tone(t,620,540,0.16,0.008,0.16,'square'); this._tone(t,945,860,0.10,0.008,0.12,'square'); },
   thud(){ if(!this.ctx)return; const t=this.ctx.currentTime; this._noise(t,0.28,0.01,0.13,320,120,'lowpass'); this._tone(t,95,55,0.22,0.01,0.14); },
   hurt(){ if(!this.ctx)return; const t=this.ctx.currentTime; this._tone(t,230,110,0.24,0.01,0.20,'triangle'); },
-  // Grito «¡¿Dónde está el oro?!»: voz masculina gigachad que pronuncia la frase, con garra y eco aterrador
+  // Grito: rugido masculino potente y seco, sin eco
   shout(){
     if(!this.ctx) return;
     const c=this.ctx, t=c.currentTime;
+    const out=c.createGain(); out.gain.value=0.8; out.connect(this.master);
 
-    // Reverb de eco largo (impulso generado: cañón de jungla con ecos discretos)
-    if(!this._shoutVerb){
-      const ir=c.createBuffer(2, Math.floor(c.sampleRate*2.8), c.sampleRate);
-      for(let ch=0; ch<2; ch++){
-        const d=ir.getChannelData(ch);
-        for(let i=0;i<d.length;i++){
-          const s=i/d.length;
-          d[i]=(Math.random()*2-1)*Math.pow(1-s,2.4)*Math.min(1,i/300);
-        }
-        for(const [tm,amp] of [[0.22,0.5],[0.47,0.34],[0.83,0.2]]){
-          const idx=Math.floor(tm*c.sampleRate);
-          if(idx<d.length) d[idx]+=amp*(ch? -1:1);
-        }
-      }
-      this._shoutVerb=c.createConvolver(); this._shoutVerb.buffer=ir;
-      const vg=c.createGain(); vg.gain.value=0.85;
-      this._shoutVerb.connect(vg); vg.connect(this.master);
-    }
+    const voice=c.createGain();
+    voice.gain.setValueAtTime(0.0001,t);
+    voice.gain.exponentialRampToValueAtTime(1.1,t+0.03);
+    voice.gain.setValueAtTime(1.1,t+0.5);
+    voice.gain.exponentialRampToValueAtTime(0.0001,t+0.95);
+    voice.connect(out);
 
-    const out=c.createGain(); out.gain.value=0.6; out.connect(this.master);
-    const voice=c.createGain(); voice.gain.setValueAtTime(0.0001,t);
-    voice.connect(out); voice.connect(this._shoutVerb);
-
-    // Garra: saturación tanh
+    // Garra: saturación agresiva
     const shaper=c.createWaveShaper();
     const curve=new Float32Array(1024);
-    for(let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=Math.tanh(3.4*x); }
+    for(let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=Math.tanh(4.5*x); }
     shaper.curve=curve;
 
-    // Formantes móviles según la vocal pronunciada
-    const VOW={ O:[430,800,2550], E:[460,1850,2450], A:[700,1150,2600], L:[380,1000,2600] };
-    const formants=[[8,1.0],[10,0.5],[12,0.25]].map(([q,g0])=>{
-      const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=q;
+    // Formantes de vocal abierta «AAAH» masculina
+    for(const [f,q,g0] of [[700,7,1.2],[1150,9,0.55],[2600,11,0.28]]){
+      const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=q;
       const g=c.createGain(); g.gain.value=g0;
       shaper.connect(bp); bp.connect(g); g.connect(voice);
-      return bp;
-    });
-
-    // Banco de osciladores (con capa demoníaca a media frecuencia)
-    const oscs=[];
-    for(const [type,det,g0,mult] of [['sawtooth',0,0.7,1],['sawtooth',9,0.55,1],['square',-7,0.18,1],['sawtooth',4,0.6,0.5]]){
-      const o=c.createOscillator(); o.type=type; o.detune.value=det; o.frequency.value=120*mult;
-      const g=c.createGain(); g.gain.value=g0; o.connect(g); g.connect(shaper);
-      o.start(t); o.stop(t+2.5); oscs.push({o,mult});
     }
 
-    // Tremor de cuerdas vocales (garra)
-    const lfo=c.createOscillator(); lfo.frequency.value=27;
-    const lfoG=c.createGain(); lfoG.gain.value=0.16;
-    lfo.connect(lfoG); lfoG.connect(voice.gain); lfo.start(t); lfo.stop(t+2.5);
-
-    // Fonemas: «¿DÓN-DE ES-TÁ EL O-RO?»  [tipo, duración, tono, volumen, caída final]
-    const segs=[
-      ['d',0.05], ['O',0.34,150,1.0],
-      ['d',0.04], ['E',0.16,132,0.8],
-      ['E',0.09,130,0.7], ['s',0.13],
-      ['t',0.05], ['A',0.38,158,1.0],
-      ['E',0.13,130,0.7], ['L',0.09,118,0.5],
-      ['O',0.20,128,0.8], ['r',0.05],
-      ['O',0.46,120,1.0,80],
-    ];
-    let tt=t+0.05;
-    for(const [ph,d,f,a,drop] of segs){
-      if(VOW[ph]){
-        voice.gain.setTargetAtTime(a,tt,0.02);
-        for(const {o,mult} of oscs){
-          o.frequency.setTargetAtTime(f*mult,tt,0.03);
-          if(drop) o.frequency.linearRampToValueAtTime(drop*mult,tt+d);
-        }
-        formants.forEach((bp,i)=> bp.frequency.setTargetAtTime(VOW[ph][i],tt,0.035));
-      }else{
-        voice.gain.setTargetAtTime(0.04,tt,0.012);
-        if(ph==='d'||ph==='t') this._noise(tt,0.22,0.004,0.05,500,1400);
-        else if(ph==='s')      this._noise(tt,0.12,0.010,0.11,4200,6500);
-        else if(ph==='r')      this._noise(tt,0.10,0.004,0.03,300,900);
-      }
-      tt+=d;
-    }
-    voice.gain.setTargetAtTime(0.0001,tt,0.09);
-
-    // Golpes de sub-bajo: «DÓN…» y el «…RO» final
-    for(const [t0,f0,f1,dur] of [[t+0.03,72,40,0.6],[tt-0.42,65,38,0.7]]){
-      const sub=c.createOscillator(); sub.type='sine';
-      sub.frequency.setValueAtTime(f0,t0); sub.frequency.exponentialRampToValueAtTime(f1,t0+dur);
-      const g=c.createGain(); g.gain.setValueAtTime(0.85,t0); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur+0.1);
-      sub.connect(g); g.connect(out); sub.start(t0); sub.stop(t0+dur+0.15);
+    // Rugido: ataque ascendente y caída brutal; capa demoníaca una octava abajo
+    for(const [type,det,g0,mult] of [['sawtooth',0,0.9,1],['sawtooth',11,0.75,1],['square',-8,0.3,1],['sawtooth',5,0.8,0.5]]){
+      const o=c.createOscillator(); o.type=type; o.detune.value=det;
+      o.frequency.setValueAtTime(140*mult,t);
+      o.frequency.exponentialRampToValueAtTime(215*mult,t+0.12);
+      o.frequency.exponentialRampToValueAtTime(95*mult,t+0.9);
+      const g=c.createGain(); g.gain.value=g0;
+      o.connect(g); g.connect(shaper);
+      o.start(t); o.stop(t+1.0);
     }
 
-    // El mar calla mientras retumba el eco
+    // Tremor de cuerdas vocales
+    const lfo=c.createOscillator(); lfo.frequency.value=30;
+    const lfoG=c.createGain(); lfoG.gain.value=0.28;
+    lfo.connect(lfoG); lfoG.connect(voice.gain); lfo.start(t); lfo.stop(t+1.0);
+
+    // Golpe de sub-bajo en el pecho
+    const sub=c.createOscillator(); sub.type='sine';
+    sub.frequency.setValueAtTime(80,t); sub.frequency.exponentialRampToValueAtTime(36,t+0.8);
+    const subG=c.createGain(); subG.gain.setValueAtTime(1.1,t); subG.gain.exponentialRampToValueAtTime(0.0001,t+0.85);
+    sub.connect(subG); subG.connect(out); sub.start(t); sub.stop(t+0.9);
+
+    // Ataque de aire explosivo
+    this._noise(t,0.4,0.005,0.1,900,3000);
+
+    // El mar calla durante el rugido
     if(this.oceanGain){
       this.oceanGain.gain.cancelScheduledValues(t);
-      this.oceanGain.gain.setTargetAtTime(0.012,t,0.06);
-      this.oceanGain.gain.setTargetAtTime(0.045,t+2.8,0.9);
+      this.oceanGain.gain.setTargetAtTime(0.008,t,0.05);
+      this.oceanGain.gain.setTargetAtTime(0.045,t+1.3,0.7);
     }
   },
   pickup(){ if(!this.ctx)return; const t=this.ctx.currentTime; this._tone(t,660,660,0.16,0.01,0.25,'triangle'); this._tone(t+0.09,990,990,0.14,0.01,0.3,'triangle'); },
@@ -982,7 +956,9 @@ function damagePlayer(dmg,fromPos){
 function shout(){
   if(state.time<state.shoutReadyAt||player.dead) return;
   state.shoutReadyAt=state.time+9;
-  state.shakeT=0.8;
+  state.shakeT=1.2;                                       // ¡que tiemble todo!
+  document.body.classList.add('tremor');
+  clearTimeout(state._tremorTO); state._tremorTO=setTimeout(()=>document.body.classList.remove('tremor'),900);
   const el=$('shoutText');
   el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
   Snd.shout();
@@ -1313,10 +1289,11 @@ function updateCamera(dt){
   camera.position.lerp(desired,1-Math.pow(0.0001,dt));
   if(state.shakeT>0){                                    // retumbo del grito
     state.shakeT=Math.max(0,state.shakeT-dt);
-    const s=state.shakeT*0.11;
+    const s=state.shakeT*state.shakeT*0.4;
     camera.position.x+=rand(-s,s); camera.position.y+=rand(-s,s); camera.position.z+=rand(-s,s);
   }
   camera.lookAt(target);
+  if(state.shakeT>0) camera.rotation.z+=rand(-1,1)*state.shakeT*state.shakeT*0.06;
 }
 
 /* =========================================================
